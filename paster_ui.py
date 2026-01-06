@@ -1,7 +1,7 @@
 from PyQt6 import QtCore
-from PyQt6.QtCore import QRunnable, QThreadPool, QSize, Qt, pyqtSlot
+from PyQt6.QtCore import QRunnable, QThreadPool, QSize, Qt, pyqtSlot, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QTableWidget, QLabel, QAbstractItemView
+from PyQt6.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QTableWidget, QLabel, QAbstractItemView, QMessageBox, QHeaderView
 from pyperclip import copy
 import sys
 import requests
@@ -14,7 +14,10 @@ SCRYFALL_URL = "https://api.scryfall.com/cards/search"
 class ImageTextLabel(QLabel):
     def __init__(self, text=None):
         super().__init__()
+        self.setScaledContents(True)
         self.text_content = text
+
+
 
 
 class LoadLabelAsync(QRunnable):
@@ -41,6 +44,8 @@ class LoadLabelAsync(QRunnable):
         else:
             self.cell_widget = ImageTextLabel(self.image_info["error"])
 
+
+
 class InfiniteCardScroll(QTableWidget):
     def __init__(self, search_box):
         super().__init__()
@@ -60,12 +65,21 @@ class InfiniteCardScroll(QTableWidget):
         self.insertColumn(0)
         self.insertColumn(0)
 
-        self.setColumnWidth(0, 175)
-        self.setColumnWidth(1, 175)
+        self.hor_header = self.horizontalHeader()
+        self.hor_header.setSectionResizeMode(0, QHeaderView.ResizeMode(1))
+        self.hor_header.setSectionResizeMode(1, QHeaderView.ResizeMode(1))
+
+        self.vert_header = self.verticalHeader()
+        self.vert_header.setFixedHeight(int(self.height() * .9))
 
         self.verticalScrollBar().valueChanged.connect(self.value_changed)
 
         self.show()
+
+    #TODO: pick back up here. Set this up to redraw pixmaps and rows/cols when window is resized
+    @pyqtSlot
+    def resize_rows_cols():
+        pass
     
     def copy_cell(self, row, col):
         print(f"Attempting to copy {(row,col)}")
@@ -102,12 +116,15 @@ class InfiniteCardScroll(QTableWidget):
                 image_info = self.image_pool.pop()
                 self.threadpool.start(LoadLabelAsync(cell_widget, image_info))
 
-
-
     def get_next_page(self):
         response = requests.get(url=self.next_page)
-        response.raise_for_status()
-
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            self.show_error("A network error occured. Please check your network access and try again.")
+            self.next_page = None
+            return
+        
         data = response.json()
         if 'next_page' in data:
             self.next_page = data['next_page']
@@ -124,8 +141,10 @@ class InfiniteCardScroll(QTableWidget):
                     print(e)
                     self.image_pool.append({"error":"Failed to find image source"})
 
+    def show_error(self, message):
+        QMessageBox.information(self, "Search Error", message)
+
     def makeRequest(self):
-        print("Resetting info...")
         self.setRowCount(0)
         self.cards_remaining = 0
         self.next_page = None
@@ -134,7 +153,14 @@ class InfiniteCardScroll(QTableWidget):
         text = search_bar.text()
         # with open("./response.json", "w") as json_file:
         response = requests.get(url=SCRYFALL_URL, params={"q":text})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            if response.status_code == 404:
+                self.show_error("No cards matched the criteria.")
+            else:
+                self.show_error("A network error occured. Please check your network access and try again.")
+            return
 
         data = response.json()
 
@@ -158,16 +184,17 @@ if __name__ == "__main__":
     app = QApplication([])
     window = QWidget()
     window.setWindowTitle("Scryfall Searcher")
-    window.setFixedSize(QSize(400,400))
-    window.setAttribute(Qt.WidgetAttribute(120))
+    window.setMinimumSize(QSize(400,400))
 
     search_bar = QLineEdit()
+    # error_bar = QLabel()
+    # error_bar.setVisible(False)
     infinite_scroll = InfiniteCardScroll(search_bar)
-
     search_bar.editingFinished.connect(infinite_scroll.makeRequest)
     
     window_layout = QVBoxLayout(window)
     window_layout.addWidget(search_bar)
+    # window_layout.addWidget(error_bar)
     window_layout.addWidget(infinite_scroll)
     window.setLayout(window_layout)
 
