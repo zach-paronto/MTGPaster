@@ -1,6 +1,6 @@
 from PyQt6 import QtCore
 from PyQt6.QtCore import QRunnable, QThreadPool, QSize, Qt, pyqtSlot, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QPainter
 from PyQt6.QtWidgets import QApplication, QWidget, QLineEdit, QVBoxLayout, QTableWidget, QLabel, QAbstractItemView, QMessageBox, QHeaderView
 from pyperclip import copy
 import sys
@@ -17,7 +17,22 @@ class ImageTextLabel(QLabel):
         self.setScaledContents(True)
         self.text_content = text
 
+    def paintEvent(self, event):
+        if not self.pixmap():
+            return
 
+        size = self.size()
+        scaled_pixmap = self.pixmap().scaled(
+            size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation # Provides better image quality
+        )
+
+        painter = QPainter(self)
+        # Center the image within the label's available space
+        x = (size.width() - scaled_pixmap.width()) // 2
+        y = (size.height() - scaled_pixmap.height()) // 2
+        painter.drawPixmap(x, y, scaled_pixmap)
 
 
 class LoadLabelAsync(QRunnable):
@@ -28,7 +43,6 @@ class LoadLabelAsync(QRunnable):
 
     @pyqtSlot()
     def run(self):
-
         if 'error' not in self.image_info:
             image_response = requests.get(self.image_info['small'])
         
@@ -49,9 +63,6 @@ class LoadLabelAsync(QRunnable):
 class InfiniteCardScroll(QTableWidget):
     def __init__(self, search_box):
         super().__init__()
-        self.setVerticalScrollMode(QAbstractItemView.ScrollMode(1))
-        self.horizontalHeader().setVisible(False)
-        self.verticalHeader().setVisible(False)
 
         self.cellActivated.connect(self.copy_cell)
 
@@ -66,20 +77,33 @@ class InfiniteCardScroll(QTableWidget):
         self.insertColumn(0)
 
         self.hor_header = self.horizontalHeader()
+        self.hor_header.setVisible(False)
         self.hor_header.setSectionResizeMode(0, QHeaderView.ResizeMode(1))
         self.hor_header.setSectionResizeMode(1, QHeaderView.ResizeMode(1))
 
         self.vert_header = self.verticalHeader()
-        self.vert_header.setFixedHeight(int(self.height() * .9))
+        self.vert_header.setVisible(False)
+        # self.vert_header.setFixedHeight(300)
 
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode(1))
         self.verticalScrollBar().valueChanged.connect(self.value_changed)
 
         self.show()
 
-    #TODO: pick back up here. Set this up to redraw pixmaps and rows/cols when window is resized
-    @pyqtSlot
-    def resize_rows_cols():
-        pass
+    #TODO: pick back up here. Set this up to redraw rows/cols when window is resized
+    @pyqtSlot()
+    def resizeEvent(self, event):
+        """
+        Overrides the standard QWidget.resizeEvent handler.
+        """
+        new_height = event.size().height()
+        # old_size = event.oldSize()
+        # print(f"Widget resized. New size: {new_size.width()}x{new_size.height()}. Old size: {old_size.width()}x{old_size.height()}")
+        
+        for i in range(0, self.rowCount()):
+            self.setRowHeight(i, new_height // 10 * 8)
+        # Call the base class implementation to ensure proper handling
+        super().resizeEvent(event)
     
     def copy_cell(self, row, col):
         print(f"Attempting to copy {(row,col)}")
@@ -101,6 +125,7 @@ class InfiniteCardScroll(QTableWidget):
         for r in range(n):
             self.insertRow(curRows+r)
             self.setRowHeight(curRows + r, 250)
+            # self.resizeRowsToContents()
 
             for i in range(2):
                 if self.image_pool.__len__() == 0 and self.next_page is not None:
@@ -109,7 +134,7 @@ class InfiniteCardScroll(QTableWidget):
                     break
 
                 cell_widget = ImageTextLabel()
-                cell_widget.setFixedSize(QSize(175,250))
+                # cell_widget.setFixedSize(QSize(175,250))
                 cell_widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
                 self.setCellWidget(curRows + r, i, cell_widget)
 
@@ -187,14 +212,11 @@ if __name__ == "__main__":
     window.setMinimumSize(QSize(400,400))
 
     search_bar = QLineEdit()
-    # error_bar = QLabel()
-    # error_bar.setVisible(False)
     infinite_scroll = InfiniteCardScroll(search_bar)
     search_bar.editingFinished.connect(infinite_scroll.makeRequest)
     
     window_layout = QVBoxLayout(window)
     window_layout.addWidget(search_bar)
-    # window_layout.addWidget(error_bar)
     window_layout.addWidget(infinite_scroll)
     window.setLayout(window_layout)
 
