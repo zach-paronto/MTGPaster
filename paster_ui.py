@@ -29,6 +29,7 @@ class ImageTextLabel(QLabel):
         )
 
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
         # Center the image within the label's available space
         x = (size.width() - scaled_pixmap.width()) // 2
         y = (size.height() - scaled_pixmap.height()) // 2
@@ -44,7 +45,7 @@ class LoadLabelAsync(QRunnable):
     @pyqtSlot()
     def run(self):
         if 'error' not in self.image_info:
-            image_response = requests.get(self.image_info['small'])
+            image_response = requests.get(self.image_info['normal'])
         
             image_response.raise_for_status()
 
