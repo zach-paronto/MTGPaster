@@ -3,7 +3,6 @@ from copy import copy
 import requests
 from PyQt6.QtCore import QThreadPool, pyqtSlot
 from PyQt6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView, QMessageBox
-from PyQt6.uic.properties import QtCore
 
 from mtgpaster import utils
 from mtgpaster.load_label_async import LoadLabelAsync
@@ -12,6 +11,10 @@ from mtgpaster.image_text_label import ImageTextLabel
 
 
 class InfiniteScrollContainer(QTableWidget):
+    """
+    Infinitely scrolling vertical container, contains all loaded cards pulled from ScryFall.
+    """
+
     def __init__(self, search_bar: SearchBar):
         super().__init__()
 
@@ -101,7 +104,7 @@ class InfiniteScrollContainer(QTableWidget):
         try:
             response.raise_for_status()
         except requests.HTTPError as e:
-            self.show_error("A network error occured. Please check your network access and try again.")
+            self.show_error("A network error occurred. Please check your network access and try again.")
             self.next_page = None
             return
 
@@ -121,7 +124,12 @@ class InfiniteScrollContainer(QTableWidget):
         self.add_lines(5)
 
 
-    def on_search_bar_editing_finished(self):
+    def on_search_bar_editing_finished(self) -> None:
+        """
+        Called when the search bar has completed editing (e.g. user hits enter).
+        :return: None
+        """
+
         self.setRowCount(0)
         self.cards_remaining = 0
         self.next_page = None
@@ -133,6 +141,12 @@ class InfiniteScrollContainer(QTableWidget):
 
 
     def parse_data(self, data: dict) -> None:
+        """
+        Parses passed card data and adds cards to the container.
+
+        :param data: The data dictionary received from request utility functions.
+        :return: None
+        """
         if not data['data']:
             return
 

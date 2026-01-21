@@ -8,6 +8,10 @@ from mtgpaster.search_bar import SearchBar
 
 
 class Application(QApplication):
+    """
+    Main application class - contains all other widgets within the program.
+    """
+
     def __init__(self):
         super().__init__([])
 
