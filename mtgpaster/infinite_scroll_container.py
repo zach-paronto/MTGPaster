@@ -111,17 +111,8 @@ class InfiniteScrollContainer(QTableWidget):
         else:
             self.next_page = None
 
-        ## TODO: make this the parse_data function, make sure it works first.
-        for card in data['data']:
-            if 'image_uris' in card:
-                self.image_pool.append({"small": card['image_uris']['small'], "normal": card['image_uris']['normal']})
-            else:
-                try:
-                    self.image_pool.append(
-                        {"small": card['image_uris']['small'], "normal": card['image_uris']['normal']})
-                except Exception as e:
-                    print(e)
-                    self.image_pool.append({"error": "Failed to find image source"})
+        self.parse_data(data)
+
 
 
     def show_error(self, message):
