@@ -1,4 +1,6 @@
+pip install -r requirements.txt
+
 pip install pyinstaller
 
-pyinstaller --onefile paster_ui.py
+pyinstaller --onefile main.py
 
