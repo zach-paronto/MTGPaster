@@ -1,10 +1,13 @@
 from copy import copy
+from typing import List
 
 import requests
 from PyQt6.QtCore import QThreadPool, pyqtSlot
 from PyQt6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView, QMessageBox
 
-from mtgpaster import utils
+from mtgpaster.api.api_client import ApiClient
+from mtgpaster.data.card_face import CardFace
+from mtgpaster.data.database_client import DatabaseClient
 from mtgpaster.load_label_async import LoadLabelAsync
 from mtgpaster.search_bar import SearchBar
 from mtgpaster.image_text_label import ImageTextLabel
@@ -17,6 +20,8 @@ class InfiniteScrollContainer(QTableWidget):
 
     def __init__(self, search_bar: SearchBar):
         super().__init__()
+
+        self.api_client = ApiClient()
 
         self.cellActivated.connect(self.copy_cell)
 
@@ -113,7 +118,6 @@ class InfiniteScrollContainer(QTableWidget):
             self.next_page = data['next_page']
         else:
             self.next_page = None
-
         self.parse_data(data)
 
 
@@ -135,29 +139,13 @@ class InfiniteScrollContainer(QTableWidget):
         self.next_page = None
         self.image_pool = []
 
-        self.parse_data(utils.make_request(self.search_bar.text()))
+        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(self.search_bar.text())
+        for oracle_id in oracle_ids:
+            self.add_card_faces_to_container(DatabaseClient.get_card_faces(oracle_id))
 
         self.add_lines(5)
 
 
-    def parse_data(self, data: dict) -> None:
-        """
-        Parses passed card data and adds cards to the container.
-
-        :param data: The data dictionary received from request utility functions.
-        :return: None
-        """
-        if not data['data']:
-            return
-
-        for card in data['data']:
-            if 'image_uris' in card:
-                self.image_pool.append({"small": card['image_uris']['small'], "normal": card['image_uris']['normal']})
-            else:
-                try:
-                    # TODO: place a flip button within the cell OR paste copy both urls to the clipboard, new line separated (?)
-                    self.image_pool.append({"small": card['card_faces'][0]['image_uris']['small'],
-                                            "normal": card['card_faces'][0]['image_uris']['normal']})
-                except Exception as e:
-                    print(f"{card['name']} had exception: {e}")
-                    self.image_pool.append({"error": "Failed to find image source"})
+    def add_card_faces_to_container(self, card_faces: List[CardFace]) -> None:
+        for face in card_faces:
+            self.image_pool.append({ 'small': face.thumbnail_url, 'normal': face.image_url })
