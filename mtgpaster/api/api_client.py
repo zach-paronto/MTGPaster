@@ -6,7 +6,7 @@ from mtgpaster.api.api_error import ApiError
 class ApiClient:
 
     @staticmethod
-    def fetch_bulk_data() -> dict | ApiError:
+    def fetch_bulk_data() -> list | ApiError:
         """
         Fetches all card data from the ScryFall API. Note that this is an extremely intensive (100 Mb+) operation,
         should be used sparingly.

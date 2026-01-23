@@ -29,10 +29,11 @@ class DatabaseClient:
 
         DatabaseClient.create_tables()
 
-        api_response: dict | ApiError = ApiClient.fetch_bulk_data()
+        api_response: list | ApiError = ApiClient.fetch_bulk_data()
         if isinstance(api_response, ApiError):
             print("Could not fetch bulk data.")
-        if isinstance(api_response, dict):
+        if isinstance(api_response, list):
+            print("Fetched bulk data from Scryfall...")
             DatabaseClient.parse_bulk_data(api_response)
 
 
@@ -84,7 +85,7 @@ class DatabaseClient:
 
 
     @staticmethod
-    def parse_bulk_data(data: dict) -> None:
+    def parse_bulk_data(data: list) -> None:
         """
         Parses the bulk data import from the ScryFall API and inserts the data into the database.
 
