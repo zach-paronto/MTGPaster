@@ -60,7 +60,7 @@ class DatabaseClient:
                         
                         CREATE TABLE IF NOT EXISTS card_faces (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            oracle_id TEXT NOT NULL,
+                            oracle_id TEXT NOT NULL UNIQUE,
                             side TEXT CHECK( side IN ('FRONT', 'BACK') ) NOT NULL DEFAULT 'FRONT',
                             thumbnail_url TEXT NOT NULL,
                             image_url TEXT NOT NULL,
@@ -143,7 +143,7 @@ class DatabaseClient:
     @staticmethod
     def insert_cards(cards: List[CardData]) -> None:
         """
-        Bulk inserts card data into the database.
+        Bulk inserts / updates card data into the database.
 
         :param cards: List of card data to insert.
         :return: None
@@ -156,7 +156,14 @@ class DatabaseClient:
             for card in cards:
                 card_data.append((card.oracle_id, card.oracle_name, card.oracle_text))
 
-            cursor.executemany("INSERT INTO card_data (oracle_id, oracle_name, oracle_text) VALUES (?, ?, ?)", card_data)
+            cursor.executemany(
+            """
+                INSERT INTO card_data (oracle_id, oracle_name, oracle_text) 
+                VALUES (?, ?, ?)
+                ON CONFLICT(oracle_id) DO UPDATE SET 
+                    oracle_name = excluded.oracle_name,
+                    oracle_text = excluded.oracle_text
+            """, card_data)
 
             # Inserting card face data.
             card_faces: List[Tuple] = []
@@ -166,7 +173,15 @@ class DatabaseClient:
                         (face.oracle_id, face.side, face.thumbnail_url, face.image_url)
                     )
 
-            cursor.executemany("INSERT INTO card_faces (oracle_id, side, thumbnail_url, image_url) VALUES (?, ?, ?, ?)", card_faces)
+            cursor.executemany(
+            """
+                INSERT INTO card_faces (oracle_id, side, thumbnail_url, image_url) 
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(oracle_id) DO UPDATE SET 
+                    side = excluded.side,
+                    thumbnail_url = excluded.thumbnail_url,
+                    image_url = excluded.image_url
+            """, card_faces)
 
 
     @staticmethod
