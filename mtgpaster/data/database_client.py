@@ -2,6 +2,7 @@ import sqlite3
 from typing import List, Tuple
 
 from mtgpaster.api.api_client import ApiClient
+from mtgpaster.api.api_error import ApiError
 from mtgpaster.data.card_data import CardFace, CardData
 
 
@@ -27,7 +28,12 @@ class DatabaseClient:
         """
 
         DatabaseClient.create_tables()
-        DatabaseClient.parse_bulk_data(ApiClient.fetch_bulk_data())
+
+        api_response: dict | ApiError = ApiClient.fetch_bulk_data()
+        if isinstance(api_response, ApiError):
+            print("Could not fetch bulk data.")
+        if isinstance(api_response, dict):
+            DatabaseClient.parse_bulk_data(api_response)
 
 
     @staticmethod
@@ -149,7 +155,6 @@ class DatabaseClient:
             for card in cards:
                 card_data.append((card.oracle_id, card.oracle_name, card.oracle_text))
 
-            # TODO: fix error where we cannot upsert, only insert on empty tables.
             cursor.executemany("INSERT INTO card_data (oracle_id, oracle_name, oracle_text) VALUES (?, ?, ?)", card_data)
 
             # Inserting card face data.
