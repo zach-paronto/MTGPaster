@@ -87,6 +87,7 @@ class InfiniteScrollContainer(QTableWidget):
 
         if value == self.verticalScrollBar().maximum():  # if we're at the end
             self.add_lines(8)
+            self.get_next_page()
 
 
     def add_lines(self, n):
@@ -96,8 +97,6 @@ class InfiniteScrollContainer(QTableWidget):
             self.setRowHeight(curRows + r, 250)
 
             for i in range(2):
-                if self.image_pool.__len__() == 0:
-                    self.get_next_page()
 
                 if self.image_pool.__len__() == 0:
                     break
@@ -131,6 +130,9 @@ class InfiniteScrollContainer(QTableWidget):
         Called when the search bar has completed editing (e.g. user hits enter).
         :return: None
         """
+
+        if len(self.search_bar.text()) == 0:
+            return
 
         self.setRowCount(0)
         self.image_pool = []
