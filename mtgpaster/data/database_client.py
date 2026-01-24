@@ -53,30 +53,30 @@ class DatabaseClient:
                     """
                         CREATE TABLE IF NOT EXISTS card_data (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            oracle_id TEXT NOT NULL UNIQUE,
+                            scryfall_id TEXT NOT NULL UNIQUE,
                             oracle_name TEXT NOT NULL,
                             oracle_text TEXT NOT NULL
                         );
                         
                         CREATE TABLE IF NOT EXISTS card_faces (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            oracle_id TEXT NOT NULL UNIQUE,
+                            scryfall_id TEXT NOT NULL UNIQUE,
                             side TEXT CHECK( side IN ('FRONT', 'BACK') ) NOT NULL DEFAULT 'FRONT',
                             thumbnail_url TEXT NOT NULL,
                             image_url TEXT NOT NULL,
                             
-                            FOREIGN KEY (oracle_id) REFERENCES card_data (oracle_id)
+                            FOREIGN KEY (scryfall_id) REFERENCES card_data (scryfall_id)
                         );
                         
                         CREATE VIRTUAL TABLE IF NOT EXISTS card_data_fts USING fts5 (
-                            oracle_id,
+                            scryfall_id,
                             oracle_name,
                             oracle_text
                         );
                         
                         CREATE TRIGGER IF NOT EXISTS card_data_insert AFTER INSERT ON card_data BEGIN 
-                            INSERT INTO card_data_fts (oracle_id, oracle_name, oracle_text) 
-                            VALUES (new.oracle_id, new.oracle_name, new.oracle_text);
+                            INSERT INTO card_data_fts (scryfall_id, oracle_name, oracle_text) 
+                            VALUES (new.scryfall_id, new.oracle_name, new.oracle_text);
                         END;
                     """
                 )
@@ -103,7 +103,7 @@ class DatabaseClient:
                 continue
 
             card_data: CardData = CardData(
-                oracle_id=entry['oracle_id'],
+                scryfall_id=entry['id'],
                 oracle_name=entry['name'],
                 oracle_text=entry['oracle_text'] if 'oracle_text' in entry else '',
             )
@@ -111,7 +111,7 @@ class DatabaseClient:
             if 'image_uris' in entry:  # Handling one-sided cards.
                 card_data.faces.append(
                     CardFace(
-                        oracle_id=entry['oracle_id'],
+                        scryfall_id=entry['id'],
                         image_url=entry['image_uris']['normal'],
                         thumbnail_url=entry['image_uris']['small'],
                         side='FRONT',
@@ -120,7 +120,7 @@ class DatabaseClient:
             else:  # Handling two-sided cards.
                 card_data.faces.append(
                     CardFace(
-                        oracle_id=entry['oracle_id'],
+                        scryfall_id=entry['id'],
                         image_url=entry['card_faces'][0]['image_uris']['normal'],
                         thumbnail_url=entry['card_faces'][0]['image_uris']['small'],
                         side='FRONT'
@@ -128,7 +128,7 @@ class DatabaseClient:
                 )
                 card_data.faces.append(
                     CardFace(
-                        oracle_id=entry['oracle_id'],
+                        scryfall_id=entry['id'],
                         image_url=entry['card_faces'][1]['image_uris']['normal'],
                         thumbnail_url=entry['card_faces'][1]['image_uris']['small'],
                         side='BACK'
@@ -154,13 +154,13 @@ class DatabaseClient:
             # Inserting general card data.
             card_data: List[Tuple] = []
             for card in cards:
-                card_data.append((card.oracle_id, card.oracle_name, card.oracle_text))
+                card_data.append((card.scryfall_id, card.oracle_name, card.oracle_text))
 
             cursor.executemany(
             """
-                INSERT INTO card_data (oracle_id, oracle_name, oracle_text) 
+                INSERT INTO card_data (scryfall_id, oracle_name, oracle_text) 
                 VALUES (?, ?, ?)
-                ON CONFLICT(oracle_id) DO UPDATE SET 
+                ON CONFLICT(scryfall_id) DO UPDATE SET 
                     oracle_name = excluded.oracle_name,
                     oracle_text = excluded.oracle_text
             """, card_data)
@@ -170,14 +170,14 @@ class DatabaseClient:
             for card in cards:
                 for face in card.faces:
                     card_faces.append(
-                        (face.oracle_id, face.side, face.thumbnail_url, face.image_url)
+                        (face.scryfall_id, face.side, face.thumbnail_url, face.image_url)
                     )
 
             cursor.executemany(
             """
-                INSERT INTO card_faces (oracle_id, side, thumbnail_url, image_url) 
+                INSERT INTO card_faces (scryfall_id, side, thumbnail_url, image_url) 
                 VALUES (?, ?, ?, ?)
-                ON CONFLICT(oracle_id) DO UPDATE SET 
+                ON CONFLICT(scryfall_id) DO UPDATE SET 
                     side = excluded.side,
                     thumbnail_url = excluded.thumbnail_url,
                     image_url = excluded.image_url
@@ -187,33 +187,33 @@ class DatabaseClient:
     @staticmethod
     def get_card_ids_fuzzy(text: str, offset: int = 0, limit: int = 6) -> List[str]:
         """
-        Fetches a list of card oracle_ids from the database using fuzzy full text search matching.
+        Fetches a list of card scryfall_id from the database using fuzzy full text search matching.
 
         :param text: The text to search for.
         :param offset: Pagination row offset.
         :param limit: Limit of records to return per query.
-        :return: List of oracle_id strings.
+        :return: List of scryfall_id strings.
         """
 
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
             cursor.row_factory = lambda c, row: row[0]
 
-            cursor.execute("SELECT oracle_id FROM card_data_fts WHERE card_data_fts = ? ORDER BY oracle_id LIMIT ? OFFSET ?", [text, limit, offset])
+            cursor.execute("SELECT scryfall_id FROM card_data_fts WHERE card_data_fts = ? ORDER BY scryfall_id LIMIT ? OFFSET ?", [text, limit, offset])
             return cursor.fetchall()
 
 
     @staticmethod
-    def get_card_faces(oracle_id: str) -> List[CardFace]:
+    def get_card_faces(scryfall_id: str) -> List[CardFace]:
         """
         Returns the face(s) of one card.
 
-        :param oracle_id: The oracle_id of the card to lookup.
+        :param scryfall_id: The scryfall_id of the card to lookup.
         :return: List of CardFace objects.
         """
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
             cursor.row_factory = lambda c, row: CardFace(row[1], row[4], row[3], row[2])
 
-            cursor.execute("SELECT * FROM card_faces WHERE oracle_id = ?", [oracle_id])
+            cursor.execute("SELECT * FROM card_faces WHERE scryfall_id = ?", [scryfall_id])
             return cursor.fetchall()

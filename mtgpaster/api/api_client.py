@@ -17,10 +17,10 @@ class ApiClient:
 
         try:
             response.raise_for_status()
-            # We should probably validate that this first bulk data object is the oracle_cards bulk data object; however,
+            # We should probably validate that this second bulk data object is the unique_artwork bulk data object; however,
             # the bulk data API does seem to guarantee that the bulk data object array will be in the same order
             # every API call.
-            bulk_data_uri = response.json()["data"][0]["download_uri"]
+            bulk_data_uri = response.json()["data"][1]["download_uri"]
             response = requests.get(url=bulk_data_uri)
 
             try:
