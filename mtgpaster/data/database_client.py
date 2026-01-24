@@ -9,7 +9,7 @@ from mtgpaster.data.card_data import CardFace, CardData
 class DatabaseClient:
 
     @staticmethod
-    def get_connection() -> sqlite3.Connection:
+    def get_connection(read_only: bool = False) -> sqlite3.Connection:
         """
         Returns the sqlite connection object for the Database.
 
@@ -197,6 +197,8 @@ class DatabaseClient:
 
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')
+
             cursor.row_factory = lambda c, row: row[0]
 
             cursor.execute("SELECT scryfall_id FROM card_data_fts WHERE card_data_fts = ? ORDER BY scryfall_id LIMIT ? OFFSET ?", [text, limit, offset])
@@ -213,6 +215,8 @@ class DatabaseClient:
         """
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')
+
             cursor.row_factory = lambda c, row: CardFace(row[1], row[4], row[3], row[2])
 
             cursor.execute("SELECT * FROM card_faces WHERE scryfall_id = ?", [scryfall_id])
