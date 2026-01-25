@@ -2,7 +2,7 @@ from copy import copy
 from typing import List
 
 from PyQt6.QtCore import QThreadPool, pyqtSlot
-from PyQt6.QtWidgets import QTableWidget, QHeaderView, QMessageBox, QAbstractItemView
+from PyQt6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView
 
 from mtgpaster.api.api_client import ApiClient
 from mtgpaster.data.card_face import CardFace
@@ -38,9 +38,7 @@ class InfiniteScrollContainer(QTableWidget):
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode(1))
         self.verticalScrollBar().valueChanged.connect(self._on_vertical_scroll)
 
-
-
-        self.search_bar.editingFinished.connect(self.on_search_bar_editing_finished)
+        self.search_bar.textChanged.connect(self._on_search_bar_text_changed)
 
         self._create_table_headers()
         self.show()
@@ -119,25 +117,21 @@ class InfiniteScrollContainer(QTableWidget):
             self.add_card_faces_to_container(DatabaseClient.get_card_faces(oracle_id))
 
 
-
     def _on_vertical_scroll(self):
         if self.verticalScrollBar().value() >= self.verticalScrollBar().maximum() * 0.8:
             self.get_next_page()
 
 
-    def on_search_bar_editing_finished(self) -> None:
-        """
-        Called when the search bar has completed editing (e.g. user hits enter).
-        :return: None
-        """
-
+    def _on_search_bar_text_changed(self):
         if len(self.search_bar.text()) == 0:
             return
+
+        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(self.search_bar.text())
 
         self.setRowCount(0)
         self.image_pool = []
 
-        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(self.search_bar.text())
+        print(oracle_ids)
         for oracle_id in oracle_ids:
             self.add_card_faces_to_container(DatabaseClient.get_card_faces(oracle_id))
 

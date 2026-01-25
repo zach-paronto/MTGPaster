@@ -198,10 +198,11 @@ class DatabaseClient:
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA cache_size = 10000')
 
             cursor.row_factory = lambda c, row: row[0]
 
-            cursor.execute("SELECT scryfall_id FROM card_data_fts WHERE card_data_fts = ? ORDER BY scryfall_id LIMIT ? OFFSET ?", [text, limit, offset])
+            cursor.execute("SELECT scryfall_id FROM card_data_fts WHERE card_data_fts = ? LIMIT ? OFFSET ?", [text, limit, offset])
             return cursor.fetchall()
 
 
@@ -216,6 +217,7 @@ class DatabaseClient:
         with DatabaseClient.get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA cache_size = 10000')
 
             cursor.row_factory = lambda c, row: CardFace(row[1], row[4], row[3], row[2])
 
