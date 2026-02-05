@@ -6,7 +6,7 @@ from mtgpaster.data.card_face import CardFace
 
 @dataclass
 class CardData:
-    oracle_id: str = ""
+    scryfall_id: str = ""
     oracle_name: str = ""
     oracle_text: str = ""
     faces: List[CardFace] = field(default_factory=list)

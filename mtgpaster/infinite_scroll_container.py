@@ -1,9 +1,8 @@
 from copy import copy
 from typing import List
 
-import requests
 from PyQt6.QtCore import QThreadPool, pyqtSlot
-from PyQt6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView, QMessageBox
+from PyQt6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView
 
 from mtgpaster.api.api_client import ApiClient
 from mtgpaster.data.card_face import CardFace
@@ -28,13 +27,24 @@ class InfiniteScrollContainer(QTableWidget):
         self.threadpool = QThreadPool()
 
         self.search_bar = search_bar
-        self.cards_remaining = 0
-        self.next_page = None
+
+        self.pagination_offset: int = 0
+
         self.image_pool = []
 
         self.insertColumn(0)
         self.insertColumn(0)
 
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode(1))
+        self.verticalScrollBar().valueChanged.connect(self._on_vertical_scroll)
+
+        self.search_bar.textChanged.connect(self._on_search_bar_text_changed)
+
+        self._create_table_headers()
+        self.show()
+
+
+    def _create_table_headers(self):
         self.hor_header = self.horizontalHeader()
         self.hor_header.setVisible(False)
         self.hor_header.setSectionResizeMode(0, QHeaderView.ResizeMode(1))
@@ -42,14 +52,6 @@ class InfiniteScrollContainer(QTableWidget):
 
         self.vert_header = self.verticalHeader()
         self.vert_header.setVisible(False)
-        # self.vert_header.setFixedHeight(300)
-
-        self.setVerticalScrollMode(QAbstractItemView.ScrollMode(1))
-        self.verticalScrollBar().valueChanged.connect(self.value_changed)
-
-        self.search_bar.editingFinished.connect(self.on_search_bar_editing_finished)
-
-        self.show()
 
 
     # TODO: pick back up here. Set this up to redraw rows/cols when window is resized
@@ -78,10 +80,12 @@ class InfiniteScrollContainer(QTableWidget):
 
 
     def value_changed(self, value):
-        if self.image_pool.__len__() == 0 and self.next_page is None:
+        if self.image_pool.__len__() == 0:
             return
+
         if value == self.verticalScrollBar().maximum():  # if we're at the end
             self.add_lines(8)
+            self.get_next_page()
 
 
     def add_lines(self, n):
@@ -91,8 +95,7 @@ class InfiniteScrollContainer(QTableWidget):
             self.setRowHeight(curRows + r, 250)
 
             for i in range(2):
-                if self.image_pool.__len__() == 0 and self.next_page is not None:
-                    self.get_next_page()
+
                 if self.image_pool.__len__() == 0:
                     break
 
@@ -105,41 +108,30 @@ class InfiniteScrollContainer(QTableWidget):
 
 
     def get_next_page(self):
-        response = requests.get(url=self.next_page)
-        try:
-            response.raise_for_status()
-        except requests.HTTPError as e:
-            self.show_error("A network error occurred. Please check your network access and try again.")
-            self.next_page = None
+        self.pagination_offset += 6
+
+        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(text=self.search_bar.text(), limit=self.pagination_offset)
+        print(oracle_ids)
+
+        for oracle_id in oracle_ids:
+            self.add_card_faces_to_container(DatabaseClient.get_card_faces(oracle_id))
+
+
+    def _on_vertical_scroll(self):
+        if self.verticalScrollBar().value() >= self.verticalScrollBar().maximum() * 0.8:
+            self.get_next_page()
+
+
+    def _on_search_bar_text_changed(self):
+        if len(self.search_bar.text()) == 0:
             return
 
-        data = response.json()
-        if 'next_page' in data:
-            self.next_page = data['next_page']
-        else:
-            self.next_page = None
-        self.parse_data(data)
-
-
-
-    def show_error(self, message):
-        QMessageBox.information(self, "Search Error", message)
-
-        self.add_lines(5)
-
-
-    def on_search_bar_editing_finished(self) -> None:
-        """
-        Called when the search bar has completed editing (e.g. user hits enter).
-        :return: None
-        """
+        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(self.search_bar.text())
 
         self.setRowCount(0)
-        self.cards_remaining = 0
-        self.next_page = None
         self.image_pool = []
 
-        oracle_ids: List[str] = DatabaseClient.get_card_ids_fuzzy(self.search_bar.text())
+        print(oracle_ids)
         for oracle_id in oracle_ids:
             self.add_card_faces_to_container(DatabaseClient.get_card_faces(oracle_id))
 
